@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Storage;
 
 class SpeechToTextController extends Controller
 {
-    public function upload(Request $request): JsonResponse
+    public function upload(SpeechToTextRequest $request): JsonResponse
     {
         try {
             if ($request->hasFile('audioFile') && $request->hasFile('textFile')) {
@@ -137,34 +137,62 @@ class SpeechToTextController extends Controller
         $client = new \GuzzleHttp\Client();
 
         $data = [
-            "model" => "gpt-4o-mini",
+            "model" => "gpt-4-turbo",
+            "temperature" => 0,
             "messages" => [
                 [
                     "role" => "system",
-                    "content" => "Transkripte edilmiş metin içerisinde hataları analiz et ve şu şekilde detaylandır:
+                    "content" => "Transkripte edilmiş metni doğru metinle karşılaştırarak hataları analiz et ve aşağıdaki formatta çıktı üret:
 
-                                1. Hatalı kelimeleri {bu formatta} işaretle.
-                                2. Cümlelerin sonunda neden hatalı olduğunu açıklamak için 'Açıklama:' ile başlayarak birer cümle yaz.
-                                3. Hata türlerini ve sayılarını belirt:
-                                   - addition_errors: Toplam ekleme hatası sayısı.
-                                   - omission_errors: Toplam eksik hata sayısı.
-                                   - reversal_errors: Toplam ters çevirme hata sayısı.
-                                   - repetition_errors: Toplam tekrar hatası sayısı.
-                                4. Dakika başına kelime (WPM) hızını belirt: 'reading_speed: x.xx'.
+                    1. Aşağıdaki maddelere göre hatalı kelimeleri {} formatında işaretle:
+                        - Hatalı kelimeler {} formatında işaretlenmelidir ve açıklamalar yapılmalıdır.
+                        - Özel isimler, özel karakterler dışında kalan kelimeler hatalı kabul edilmemelidir ve herhangi bir kategori ile bağlanmamalıdır.
 
-                                Örnek:
-                                bir hafta önce {annesi ile} ablası çarşıya çıkmışlardı hakan evde yalnız kalmıştı derslerini bitirdikten sonra aklına {reçel} {reçel} yemek gelmişti.
-                                Açıklama:
-                                1. 'annesi ile' ifadesi bağlam hatası içeriyor.
-                                2. 'reçel' kelimesi iki kere tekrar edilmiştir.
-                                Hatalar:
-                                addition_errors: 1
-                                omission_errors: 0
-                                reversal_errors: 0
-                                repetition_errors: 0
-                                Okuma Hızı:
-                                reading_speed: 67.57
-                                "
+                    2. Aşağıdaki maddeye göre kelimeler hatalı sayılmayacaktır:
+                       - Özel isimler (örneğin Hakan, İstanbul) ve özel karakterler (noktalama işaretleri, semboller) hata olarak kabul edilmemelidir.
+
+                    3. Açıklamalar:
+                        - Hata türleri belirtmeden, sadece bağlamdaki yanlışlıklar ve nedenlerini açıklayın. Her bir hata için doğru kullanımın ne olması gerektiğini belirtin..
+                        - Örnekler:
+                          - 'annesi ile' ifadesi bağlam hatası içeriyor; doğru kullanım 'annesiyle' olmalıdır.
+                          - 'çok su içmiş midesindeki' ifadesi gereksiz yere tekrar edilmiştir.
+                          - 'kalmıştı derslerini' kelimesi yanlış kullanılmıştır; doğru kullanım 'kalmıştı ve derslerini' olmalıdır.
+
+                    4. Transkripte edilmiş metinde Hata türlerini ve sadece sayılarını 'Hatalar:' başlığı altında şu şekilde belirtmeni istiyorum.
+                        - Fazladan eklenmiş kelimeler, bağlaçlar, zaman ve gereklilik kipleri, heceler 'addition_errors' kategorisine girer.
+                            Örnek: 'Hakan çok su içmişti' yerine 'Hakan su içmişti'.
+                            Örnek: 'balığı' yerine 'balı'.
+
+                        - Eksik olan kelimeler, bağlaçlar, zaman ve gereklilik kipleri, heceler 'omission_errors' kategorisinde ele alınır.
+                            Örnek: 'Hakan evde yalnız kalmıştı derslerini' yerine 'Hakan evde yalnız kalmıştı ve derslerini'.
+                            Örnek: 'reçelde' yerine 'reçelden'
+
+                        - Tersine çevrilmiş kelimeler kullanılmışsa 'reversal_errors' kategorisinde ele alınır.
+                            Örnek: 'Ev' yerine 'Ve' kullanılması gibi.
+                            Örnek: 'Patik' yerine 'Kitap' gibi.
+
+                        - Tekrar edilmiş kelimeler ve heceler 'repetition_errors' kategorisinde ele alınır.
+                            Örnek: 'aklına reçel reçel yemek gelmişti' yerine 'aklına reçel yemek gelmişti'.
+                            Örnek: 'sıcak sıcak çay' yerine 'sıcak çay'
+
+                        - Yukarıdaki kategorilere uymayan hatalar 'other_errors' kategorisine eklenmelidir.
+                            Örnek: Yanlış yazım hataları 'bacak' yerine 'böcek'
+
+                    Örnek Çıktı:
+                    Metin: 'bir hafta önce {annesi ile} ablası çarşıya çıkmışlardı hakan evde yalnız kalmıştı derslerini bitirdikten sonra aklına {reçel} {reçel} yemek gelmişti.'
+
+                    Açıklama:
+                    1. 'annesi ile' ifadesi bağlam hatası içeriyor; doğru kullanım 'annesiyle' olmalıdır.
+                    2. 'reçel' kelimesi iki kere tekrar edilmiştir.
+
+                    Hatalar:
+                    - addition_errors: 1
+                    - omission_errors: 0
+                    - reversal_errors: 1
+                    - repetition_errors: 2
+                    - other_errors: 0
+
+                    Bu çıktıyı her bir hata için aynı şekilde üret. Ek olarak, tespit edilen diğer anlam veya dilbilgisel hataları da belirtin."
 
                 ],
                 [
@@ -191,17 +219,26 @@ class SpeechToTextController extends Controller
         }
         $analysisText = json_decode($response->getBody()->getContents(), true);
 
+        $totalTokens = $analysisText['usage']['total_tokens'] ?? 0;
+
+        // bir token yaklaşık olarak 4 karaktere denk gelir ve bir token ortalama olarak 0.75 kelimeye karşılık gelir
+        $wordCount = $totalTokens * 0.75;
+
+        // Okuma süresi dakikada 200 kelime
+        $readingSpeed = $wordCount / 200;
+
+        // Ondalıklı biçimlendir Örn; 4.7999997 --> 4.80
+        $readingSpeed = number_format($readingSpeed, 2);
+
         $content = $analysisText['choices'][0]['message']['content'] ?? null;
 
-        preg_match('/(.*?)Açıklama:/s', $content, $part1);
+        preg_match('/Metin:\s*(.*?)Açıklama:/s', $content, $part1);
         preg_match('/Açıklama:\s*(.*?)Hatalar:/s', $content, $part2);
-        preg_match('/Hatalar:\s*(.*?)Okuma Hızı:/s', $content, $part3);
-        preg_match('/Okuma Hızı:\s*reading_speed:\s*(\d+(\.\d+)?)/', $content, $part4);
+        preg_match('/Hatalar:\s*(.*?)$/s', $content, $part3);
 
         $text = isset($part1[1]) ? trim($part1[1]) : '';
         $description = isset($part2[1]) ? trim($part2[1]) : '';
         $errors = isset($part3[1]) ? trim($part3[1]) : '';
-        $readingSpeed = isset($part4[1]) ? floatval($part4[1]) : 0.0;
 
         preg_match_all('/([a-z_]+_errors): (\d+)/', $errors, $errorMatches);
 
@@ -211,6 +248,7 @@ class SpeechToTextController extends Controller
         }
 
         return [
+            'original_text' => $originalText,
             'text' => $text,
             'description' => $description,
             'errors' => $errorsArray,
